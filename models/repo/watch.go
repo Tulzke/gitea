@@ -184,3 +184,12 @@ func WatchIfAuto(ctx context.Context, userID, repoID int64, isWrite bool) error 
 	}
 	return watchRepoMode(ctx, watch, WatchModeAuto)
 }
+
+func FilterWatchedRepoIds(ctx context.Context, userId int64, repoIds []int64) ([]int64, error) {
+	ids := make([]int64, len(repoIds))
+	return ids, db.GetEngine(ctx).Table("watch").
+		Where("watch.user_id=?", userId).
+		In("watch.repo_id", repoIds).
+		Select("watch.repo_id").
+		Find(&ids)
+}

@@ -324,6 +324,7 @@ func Repos(ctx *context.Context) {
 			}
 		}
 
+		ctx.Data["Hi"] = "Hello there from setting/profile"
 		ctx.Data["Repos"] = repos
 	}
 	ctx.Data["Owner"] = ctxUser

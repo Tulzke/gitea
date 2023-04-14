@@ -4,8 +4,10 @@
 package org
 
 import (
+	"code.gitea.io/gitea/modules/log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/organization"
@@ -143,6 +145,50 @@ func Home(ctx *context.Context) {
 		return
 	}
 
+	repoIds := make([]int64, len(repos))
+	for i, repo := range repos {
+		repoIds[i] = repo.ID
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var watchedRepoIdsMap map[int64]bool
+	go func() {
+		defer wg.Done()
+		watchedRepoIds, err := repo_model.FilterWatchedRepoIds(ctx, ctx.Doer.ID, repoIds)
+		if err != nil {
+			log.Error("Failed getting watched repositories ids: %w", err)
+			return
+		}
+		if len(watchedRepoIds) == 0 {
+			return
+		}
+		watchedRepoIdsMap = make(map[int64]bool, len(watchedRepoIds))
+		for _, id := range watchedRepoIds {
+			watchedRepoIdsMap[id] = true
+		}
+	}()
+
+	wg.Add(1)
+	var starredRepoIdsMap map[int64]bool
+	go func() {
+		defer wg.Done()
+		starredRepoIds, err := repo_model.FilterStarredRepoIds(ctx, ctx.Doer.ID, repoIds)
+		if err != nil {
+			log.Error("Failed getting starred repositories ids: %w", err)
+			return
+		}
+		if len(starredRepoIds) == 0 {
+			return
+		}
+		starredRepoIdsMap = make(map[int64]bool, len(starredRepoIds))
+		for _, id := range starredRepoIds {
+			starredRepoIdsMap[id] = true
+		}
+	}()
+
+	wg.Wait()
+
 	ctx.Data["Owner"] = org
 	ctx.Data["Repos"] = repos
 	ctx.Data["Total"] = count
@@ -151,6 +197,8 @@ func Home(ctx *context.Context) {
 	ctx.Data["Teams"] = ctx.Org.Teams
 	ctx.Data["DisableNewPullMirrors"] = setting.Mirror.DisableNewPull
 	ctx.Data["PageIsViewRepositories"] = true
+	ctx.Data["WatchedRepos"] = watchedRepoIdsMap
+	ctx.Data["StarredRepos"] = starredRepoIdsMap
 
 	pager := context.NewPagination(int(count), setting.UI.User.RepoPagingNum, page, 5)
 	pager.SetDefaultParams(ctx)

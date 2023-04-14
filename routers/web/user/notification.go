@@ -394,6 +394,22 @@ func NotificationWatching(ctx *context.Context) {
 		return
 	}
 	total := int(count)
+
+	repoIds := make([]int64, len(repos))
+	for i, repo := range repos {
+		repoIds[i] = repo.ID
+	}
+
+	watchedRepoIds, err := repo_model.FilterWatchedRepoIds(ctx, ctx.Doer.ID, repoIds)
+	if err != nil {
+		log.Error("Failed getting watched repositories ids: %w", err)
+	}
+	watchedRepoIdsSet := make(map[int64]bool, len(watchedRepoIds))
+	for _, id := range watchedRepoIds {
+		watchedRepoIdsSet[id] = true
+	}
+
+	ctx.Data["WatchingRepos"] = watchedRepoIdsSet
 	ctx.Data["Total"] = total
 	ctx.Data["Repos"] = repos
 
@@ -403,7 +419,7 @@ func NotificationWatching(ctx *context.Context) {
 	ctx.Data["Page"] = pager
 
 	ctx.Data["Status"] = 2
-	ctx.Data["Title"] = ctx.Tr("notification.watching")
+	ctx.Data["Title"] = ctx.Tr("watchedRepoId.watching")
 
 	ctx.HTML(http.StatusOK, tplNotificationSubscriptions)
 }

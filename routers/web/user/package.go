@@ -322,6 +322,7 @@ func PackageSettings(ctx *context.Context) {
 		Actor:   pd.Owner,
 		Private: true,
 	})
+	ctx.Data["Hi"] = "Hello there from package"
 	ctx.Data["Repos"] = repos
 	ctx.Data["CanWritePackages"] = ctx.Package.AccessMode >= perm.AccessModeWrite || ctx.IsUserSiteAdmin()
 

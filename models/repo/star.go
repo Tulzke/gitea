@@ -85,3 +85,12 @@ func GetStargazers(repo *Repository, opts db.ListOptions) ([]*user_model.User, e
 	users := make([]*user_model.User, 0, 8)
 	return users, sess.Find(&users)
 }
+
+func FilterStarredRepoIds(ctx context.Context, userId int64, repoIds []int64) ([]int64, error) {
+	ids := make([]int64, len(repoIds))
+	return ids, db.GetEngine(ctx).Table("star").
+		Where("star.uid=?", userId).
+		In("star.repo_id", repoIds).
+		Select("star.repo_id").
+		Find(&ids)
+}

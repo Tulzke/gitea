@@ -289,6 +289,7 @@ func Milestones(ctx *context.Context) {
 	}
 
 	ctx.Data["Milestones"] = milestones
+	ctx.Data["Hi"] = "Hello there from user/home.Milestone"
 	ctx.Data["Repos"] = showRepos
 	ctx.Data["Counts"] = counts
 	ctx.Data["MilestoneStats"] = milestoneStats
@@ -657,6 +658,7 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 	}
 	ctx.Data["CommitLastStatus"] = lastStatus
 	ctx.Data["CommitStatuses"] = commitStatuses
+	ctx.Data["Hi"] = "Hello there from user/home"
 	ctx.Data["Repos"] = showRepos
 	ctx.Data["Counts"] = issueCountByRepo
 	ctx.Data["IssueStats"] = issueStats

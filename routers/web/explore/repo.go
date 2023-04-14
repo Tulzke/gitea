@@ -112,7 +112,8 @@ func RenderRepoSearch(ctx *context.Context, opts *RepoSearchOptions) {
 		Language:           language,
 		IncludeDescription: setting.UI.SearchRepoDescription,
 		OnlyShowRelevant:   opts.OnlyShowRelevant,
-	})
+	},
+	)
 	if err != nil {
 		ctx.ServerError("SearchRepository", err)
 		return
@@ -129,10 +130,23 @@ func RenderRepoSearch(ctx *context.Context, opts *RepoSearchOptions) {
 		return
 	}
 
+	repoIds := make([]int64, len(repos))
+	for i, repo := range repos {
+		repoIds[i] = repo.ID
+	}
+
+	watchedRepoIds, err := repo_model.FilterWatchedRepoIds(ctx, ctx.Doer.ID, repoIds)
+	if err != nil {
+		log.Error("Failed getting watched repositories ids: %w", err)
+	}
+
+	ctx.Data["WatchingRepos"] = watchedRepoIds
 	ctx.Data["Keyword"] = keyword
 	ctx.Data["Total"] = count
+	ctx.Data["Hi"] = "Hello there from explore/repo"
 	ctx.Data["Repos"] = repos
 	ctx.Data["IsRepoIndexerEnabled"] = setting.Indexer.RepoIndexerEnabled
+	ctx.Data["Hi"] = "Hello there"
 
 	pager := context.NewPagination(int(count), opts.PageSize, page, 5)
 	pager.SetDefaultParams(ctx)
@@ -170,5 +184,6 @@ func Repos(ctx *context.Context) {
 		Private:          ctx.Doer != nil,
 		TplName:          tplExploreRepos,
 		OnlyShowRelevant: onlyShowRelevant,
-	})
+	},
+	)
 }

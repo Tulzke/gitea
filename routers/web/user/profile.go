@@ -5,9 +5,11 @@
 package user
 
 import (
+	"code.gitea.io/gitea/modules/log"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	activities_model "code.gitea.io/gitea/models/activities"
 	"code.gitea.io/gitea/models/db"
@@ -127,10 +129,12 @@ func Profile(ctx *context.Context) {
 	topicOnly := ctx.FormBool("topic")
 
 	var (
-		repos   []*repo_model.Repository
-		count   int64
-		total   int
-		orderBy db.SearchOrderBy
+		repos             []*repo_model.Repository
+		count             int64
+		total             int
+		orderBy           db.SearchOrderBy
+		watchedRepoIdsMap map[int64]bool
+		starredRepoIdsMap map[int64]bool
 	)
 
 	ctx.Data["SortType"] = ctx.FormString("sort")
@@ -235,6 +239,21 @@ func Profile(ctx *context.Context) {
 			return
 		}
 
+		repoIds := make([]int64, len(repos))
+		for i, repo := range repos {
+			repoIds[i] = repo.ID
+		}
+		starredRepoIds, err := repo_model.FilterStarredRepoIds(ctx, ctx.Doer.ID, repoIds)
+		if err != nil {
+			log.Error("Failed getting starred repositories ids: %w", err)
+		}
+		if len(starredRepoIds) > 0 {
+			starredRepoIdsMap = make(map[int64]bool, len(starredRepoIds))
+			for _, id := range starredRepoIds {
+				starredRepoIdsMap[id] = true
+			}
+		}
+
 		total = int(count)
 	case "projects":
 		ctx.Data["OpenProjects"], _, err = project_model.FindProjects(ctx, project_model.SearchOptions{
@@ -267,6 +286,21 @@ func Profile(ctx *context.Context) {
 			return
 		}
 
+		repoIds := make([]int64, len(repos))
+		for i, repo := range repos {
+			repoIds[i] = repo.ID
+		}
+		watchedRepoIds, err := repo_model.FilterWatchedRepoIds(ctx, ctx.Doer.ID, repoIds)
+		if err != nil {
+			log.Error("Failed getting watched repositories ids: %w", err)
+		}
+		if len(watchedRepoIds) > 0 {
+			watchedRepoIdsMap = make(map[int64]bool, len(watchedRepoIds))
+			for _, id := range watchedRepoIds {
+				watchedRepoIdsMap[id] = true
+			}
+		}
+
 		total = int(count)
 	default:
 		repos, count, err = repo_model.SearchRepository(ctx, &repo_model.SearchRepoOptions{
@@ -289,10 +323,53 @@ func Profile(ctx *context.Context) {
 			return
 		}
 
+		repoIds := make([]int64, len(repos))
+		for i, repo := range repos {
+			repoIds[i] = repo.ID
+		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			watchedRepoIds, err := repo_model.FilterWatchedRepoIds(ctx, ctx.Doer.ID, repoIds)
+			if err != nil {
+				log.Error("Failed getting watched repositories ids: %w", err)
+				return
+			}
+			if len(watchedRepoIds) == 0 {
+				watchedRepoIdsMap = make(map[int64]bool, len(watchedRepoIds))
+				for _, id := range watchedRepoIds {
+					watchedRepoIdsMap[id] = true
+				}
+			}
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			starredRepoIds, err := repo_model.FilterStarredRepoIds(ctx, ctx.Doer.ID, repoIds)
+			if err != nil {
+				log.Error("Failed getting starred repositories ids: %w", err)
+				return
+			}
+			if len(starredRepoIds) == 0 {
+				starredRepoIdsMap = make(map[int64]bool, len(starredRepoIds))
+				for _, id := range starredRepoIds {
+					starredRepoIdsMap[id] = true
+				}
+			}
+
+		}()
+
+		wg.Wait()
+
 		total = int(count)
 	}
 	ctx.Data["Repos"] = repos
 	ctx.Data["Total"] = total
+	ctx.Data["WatchedRepos"] = watchedRepoIdsMap
+	ctx.Data["StarredRepos"] = starredRepoIdsMap
 
 	pager := context.NewPagination(total, pagingNum, page, 5)
 	pager.SetDefaultParams(ctx)
